@@ -1,4 +1,4 @@
-.reactor-page { padding: 2rem; }
+.reactor-page { padding: 1.5rem 2rem; }
 
 .reactor-diagram {
   background: #0f172a;
@@ -10,8 +10,131 @@
 
 .reactor-svg {
   width: 100%;
-  max-height: 420px;
+  max-height: 350px;
   display: block;
+}
+
+/* Controls */
+.chart-controls {
+  background: #0f172a;
+  border: 1px solid #1e293b;
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.controls-row {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  margin-bottom: 0.5rem;
+}
+
+.controls-row:last-child { margin-bottom: 0; }
+
+.control-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.control-group label {
+  font-size: 0.7rem;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.control-group input[type="datetime-local"] {
+  background: #1e293b;
+  border: 1px solid #334155;
+  color: #e2e8f0;
+  border-radius: 4px;
+  padding: 0.3rem 0.5rem;
+  font-size: 0.8rem;
+  font-family: monospace;
+}
+
+.control-group button,
+.btn-apply,
+.btn-toggle {
+  background: #1e293b;
+  border: 1px solid #334155;
+  color: #e2e8f0;
+  border-radius: 4px;
+  padding: 0.3rem 0.6rem;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.control-group button:hover,
+.btn-apply:hover,
+.btn-toggle:hover {
+  background: #334155;
+}
+
+.btn-apply {
+  background: #3b82f6;
+  border-color: #3b82f6;
+}
+
+.btn-row {
+  display: flex;
+  gap: 0.3rem;
+}
+
+.zoom-group { align-items: flex-start; }
+.zoom-group span {
+  font-size: 0.8rem;
+  color: #94a3b8;
+  min-width: 2.5rem;
+  text-align: center;
+  display: inline-block;
+  padding: 0.3rem 0;
+}
+
+/* Variable toggles */
+.var-toggles {
+  background: #0f172a;
+  border: 1px solid #1e293b;
+  border-radius: 8px;
+  padding: 0.6rem 0.75rem;
+  margin-bottom: 0.75rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.8rem;
+  align-items: center;
+}
+
+.var-check {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.72rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.var-check input { display: none; }
+
+.var-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.var-check input:not(:checked) + .var-dot + * {
+  opacity: 0.35;
+  text-decoration: line-through;
+}
+
+.btn-toggle {
+  font-size: 0.65rem;
+  padding: 0.15rem 0.5rem;
 }
 
 /* Chart */
@@ -19,19 +142,14 @@
   background: #0f172a;
   border: 1px solid #1e293b;
   border-radius: 8px;
-  padding: 1.25rem;
+  padding: 1rem;
 }
 
-.reactor-chart h3 {
-  font-size: 0.95rem;
-  color: #e2e8f0;
-  margin: 0 0 1rem 0;
-  font-weight: 600;
-}
+.chart-scroll { overflow-x: auto; }
 
-.chart-container { overflow-x: auto; }
-
-.chart-svg {
-  width: 100%;
-  min-width: 300px;
+/* Subtitle */
+.subtitle {
+  font-size: 0.8rem;
+  color: #64748b;
+  margin-left: 0.75rem;
 }

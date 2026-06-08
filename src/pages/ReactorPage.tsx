@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { api } from '../api';
 import './ReactorPage.css';
 
@@ -7,7 +7,6 @@ interface Variable {
   name: string;
   value: string | null;
   data_type: string;
-  connection_name: string;
   group: string;
 }
 
@@ -18,123 +17,160 @@ interface HistoryPoint {
 
 const GROUP = 'reactor1';
 const TITLE = '⚗️ Reactor 1';
+const COLORS = ['#22c55e', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4',
+                '#ec4899', '#84cc16', '#f97316', '#14b8a6', '#a855f7'];
+
+function fmtTime(iso: string): string {
+  const d = new Date(iso);
+  return d.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+}
+
+function fmtDate(iso: string): string {
+  const d = new Date(iso);
+  return d.toLocaleDateString('es-CO') + ' ' + d.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
+}
+
+function toLocalISO(date: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
 
 export default function ReactorPage() {
   const [variables, setVariables] = useState<Variable[]>([]);
   const [history, setHistory] = useState<Record<number, HistoryPoint[]>>({});
+  const [visibleIds, setVisibleIds] = useState<Set<number>>(new Set());
   const [error, setError] = useState('');
+  const [zoom, setZoom] = useState(1);
+  const [panX, setPanX] = useState(0);
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
 
-  // Load variables filtered by group
+  // Load variables
   useEffect(() => {
     api.get<Variable[]>('/api/variables')
       .then(vars => {
         const filtered = vars.filter(v => v.group === GROUP);
         setVariables(filtered);
+        setVisibleIds(new Set(filtered.map(v => v.id)));
         loadHistory(filtered);
       })
       .catch(() => setError('Error al cargar variables'));
   }, []);
 
-  // Auto-refresh cada 2s
+  // Refresh values every 2s
   useEffect(() => {
-    const interval = setInterval(() => {
+    const i = setInterval(() => {
       api.get<Variable[]>('/api/variables')
-        .then(vars => {
-          const filtered = vars.filter(v => v.group === GROUP);
-          setVariables(filtered);
-        })
+        .then(vars => setVariables(vars.filter(v => v.group === GROUP)))
         .catch(() => {});
     }, 2000);
-    return () => clearInterval(interval);
+    return () => clearInterval(i);
   }, []);
 
-  async function loadHistory(vars: Variable[]) {
-    if (vars.length === 0) return;
+  const loadHistory = useCallback(async (vars?: Variable[]) => {
+    const vlist = vars || variables;
+    if (vlist.length === 0) return;
     try {
-      const ids = vars.map(v => v.id);
-      const data = await api.post<Record<string, HistoryPoint[]>>('/api/variables/history-batch', { variable_ids: ids });
-      // Keys are strings from JSON
+      const body: Record<string, unknown> = { variable_ids: vlist.map(v => v.id) };
+      if (dateFrom) body.from = dateFrom + ':00';
+      if (dateTo) body.to = dateTo + ':00';
+      const data = await api.post<Record<string, HistoryPoint[]>>('/api/variables/history-batch', body);
       const parsed: Record<number, HistoryPoint[]> = {};
-      for (const [key, points] of Object.entries(data)) {
-        parsed[Number(key)] = points;
+      for (const [key, pts] of Object.entries(data)) {
+        parsed[Number(key)] = pts;
       }
       setHistory(parsed);
-    } catch {
-      // Silently ignore
-    }
-  }
+    } catch { /* ignore */ }
+  }, [variables, dateFrom, dateTo]);
 
-  const getNumeric = (v: Variable) => {
-    if (v.value === null || v.value === undefined) return null;
-    const n = parseFloat(v.value);
-    return isNaN(n) ? null : n;
+  const toggleVar = (id: number) => {
+    setVisibleIds(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
   };
 
-  // Chart dimensions
-  const CHART_W = 700;
-  const CHART_H = 220;
-  const PAD_L = 50;
-  const PAD_R = 10;
-  const PAD_T = 15;
-  const PAD_B = 30;
-  const plotW = CHART_W - PAD_L - PAD_R;
-  const plotH = CHART_H - PAD_T - PAD_B;
+  const selectAll = () => setVisibleIds(new Set(variables.map(v => v.id)));
+  const selectNone = () => setVisibleIds(new Set());
 
-  // Build chart data: all points across all variables, find min/max
-  const allPoints: { varId: number; varName: string; value: number; ts: number }[] = [];
-  for (const v of variables) {
-    const pts = history[v.id] || [];
-    for (const p of pts) {
-      const val = parseFloat(p.value);
-      if (!isNaN(val)) {
-        allPoints.push({ varId: v.id, varName: v.name, value: val, ts: new Date(p.read_at).getTime() });
-      }
+  // Build chart data
+  const visibleVars = variables.filter(v => visibleIds.has(v.id));
+  const allPoints: { varId: number; ts: number; value: number }[] = [];
+  const varData: Record<number, { name: string; pts: { ts: number; value: number }[]; min: number; max: number }> = {};
+
+  for (const v of visibleVars) {
+    const pts = (history[v.id] || [])
+      .map(p => ({ ts: new Date(p.read_at).getTime(), value: parseFloat(p.value) }))
+      .filter(p => !isNaN(p.value));
+    if (pts.length > 0) {
+      const vals = pts.map(p => p.value);
+      const name = v.name.length > 30 ? v.name.slice(0, 29) + '\u2026' : v.name;
+      varData[v.id] = { name, pts, min: Math.min(...vals), max: Math.max(...vals) };
+      for (const p of pts) allPoints.push({ varId: v.id, ...p });
     }
   }
 
   const hasData = allPoints.length > 0;
-  let tMin = 0, tMax = 0, vMin = 0, vMax = 100;
+  let tMin = 0, tMax = 0;
   if (hasData) {
     const times = allPoints.map(p => p.ts);
-    const vals = allPoints.map(p => p.value);
     tMin = Math.min(...times);
     tMax = Math.max(...times);
-    vMin = Math.min(...vals);
-    vMax = Math.max(...vals);
-    const pad = (vMax - vMin) * 0.1 || 1;
-    vMin -= pad;
-    vMax += pad;
+    if (tMin === tMax) { tMin -= 60000; tMax += 60000; }
   }
 
-  // Colors
-  const colors = ['#22c55e', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4',
-                  '#ec4899', '#84cc16', '#f97316', '#14b8a6', '#a855f7'];
+  // Dimensions
+  const PAD = { l: 60, r: 20, t: 20, b: 55 };
+  const baseW = 900, baseH = 400;
+  const W = baseW * zoom, H = baseH;
+  const plotW = W - PAD.l - PAD.r;
+  const plotH = H - PAD.t - PAD.b;
 
-  // Group points by variable
-  const pointsByVar: Record<number, { name: string; pts: { x: number; y: number }[] }> = {};
-  for (const v of variables) {
-    const pts = (history[v.id] || [])
-      .map(p => ({ val: parseFloat(p.value), ts: new Date(p.read_at).getTime() }))
-      .filter(p => !isNaN(p.val));
+  const timeRange = tMax - tMin || 1;
+  const viewStart = tMin - panX;
+  const viewEnd = tMax - panX;
+  const viewRange = viewEnd - viewStart;
 
-    if (pts.length > 0 && tMax > tMin) {
-      pointsByVar[v.id] = {
-        name: v.name.length > 25 ? v.name.slice(0, 24) + '…' : v.name,
-        pts: pts.map(p => ({
-          x: PAD_L + ((p.ts - tMin) / (tMax - tMin)) * plotW,
-          y: PAD_T + plotH - ((p.val - vMin) / (vMax - vMin)) * plotH,
-        })),
-      };
+  const toX = (ts: number) => PAD.l + ((ts - viewStart) / viewRange) * plotW;
+
+  // Y-axis per variable with padding
+  const yRanges: Record<number, { min: number; max: number }> = {};
+  for (const [id, data] of Object.entries(varData)) {
+    const pad = (data.max - data.min) * 0.15 || 1;
+    yRanges[Number(id)] = { min: data.min - pad, max: data.max + pad };
+  }
+
+  const globalYMin = hasData
+    ? Math.min(...Object.values(yRanges).map(r => r.min))
+    : 0;
+  const globalYMax = hasData
+    ? Math.max(...Object.values(yRanges).map(r => r.max))
+    : 100;
+
+  // Time ticks
+  const ticks: { ts: number; label: string }[] = [];
+  if (hasData && viewRange > 0) {
+    const tickCount = Math.max(2, Math.floor(plotW / 90));
+    for (let i = 0; i <= tickCount; i++) {
+      const ts = viewStart + (viewRange * i) / tickCount;
+      ticks.push({ ts, label: fmtTime(new Date(ts).toISOString()) });
     }
   }
+
+  // Handle quick date ranges
+  const setRange = (hours: number) => {
+    const now = new Date();
+    const from = new Date(now.getTime() - hours * 3600000);
+    setDateFrom(toLocalISO(from));
+    setDateTo(toLocalISO(now));
+  };
 
   return (
     <div className="reactor-page">
       <header className="topbar">
         <h1>{TITLE}</h1>
-        {variables.length > 0 && (
-          <span className="subtitle">{variables.length} variables · grupo: {GROUP}</span>
-        )}
+        <span className="subtitle">{variables.length} variables · grupo: {GROUP}</span>
       </header>
 
       {/* Esquema SVG */}
@@ -175,41 +211,124 @@ export default function ReactorPage() {
         </svg>
       </div>
 
-      {/* Gráfica de líneas con historial */}
-      <div className="reactor-chart">
-        <h3>📈 Historial de variables</h3>
-        {error && <p className="error">{error}</p>}
+      {/* CHART CONTROLS */}
+      <div className="chart-controls">
+        <div className="controls-row">
+          <div className="control-group">
+            <label>📅 Desde</label>
+            <input type="datetime-local" value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
+          </div>
+          <div className="control-group">
+            <label>📅 Hasta</label>
+            <input type="datetime-local" value={dateTo} onChange={e => setDateTo(e.target.value)} />
+          </div>
+          <div className="control-group">
+            <label>&nbsp;</label>
+            <button onClick={() => loadHistory()} className="btn-apply">Aplicar</button>
+          </div>
+          <div className="control-group quick-btns">
+            <label>Rápido</label>
+            <div className="btn-row">
+              <button onClick={() => { setDateFrom(''); setDateTo(''); setTimeout(() => loadHistory(variables), 50); }}>Todo</button>
+              <button onClick={() => setRange(1)}>1h</button>
+              <button onClick={() => setRange(6)}>6h</button>
+              <button onClick={() => setRange(24)}>24h</button>
+              <button onClick={() => setRange(168)}>7d</button>
+            </div>
+          </div>
+        </div>
 
+        <div className="controls-row">
+          <div className="control-group zoom-group">
+            <label>🔍 Zoom</label>
+            <button onClick={() => setZoom(z => Math.min(z * 1.5, 8))}>+</button>
+            <span>{zoom.toFixed(1)}x</span>
+            <button onClick={() => setZoom(z => Math.max(z / 1.5, 0.5))}>−</button>
+            <button onClick={() => { setZoom(1); setPanX(0); }}>Reset</button>
+          </div>
+          <div className="control-group">
+            <label>◀▶ Desplazar</label>
+            <button onClick={() => setPanX(p => p - timeRange * 0.2)}>◀</button>
+            <button onClick={() => setPanX(p => p + timeRange * 0.2)}>▶</button>
+          </div>
+        </div>
+      </div>
+
+      {/* VARIABLE TOGGLES */}
+      <div className="var-toggles">
+        <button onClick={selectAll} className="btn-toggle">Todos</button>
+        <button onClick={selectNone} className="btn-toggle">Ninguno</button>
+        {variables.map((v, i) => (
+          <label key={v.id} className="var-check" style={{ color: COLORS[i % COLORS.length] }}>
+            <input
+              type="checkbox"
+              checked={visibleIds.has(v.id)}
+              onChange={() => toggleVar(v.id)}
+            />
+            <span className="var-dot" style={{ background: COLORS[i % COLORS.length] }} />
+            {v.name.length > 25 ? v.name.slice(0, 24) + '\u2026' : v.name}
+          </label>
+        ))}
+      </div>
+
+      {/* CHART */}
+      <div className="reactor-chart">
+        {error && <p className="error">{error}</p>}
         {!hasData ? (
-          <p className="muted">Sin datos históricos. Activa la historización en Variables.</p>
+          <p className="muted">Sin datos. Activa historización y lectura del PLC.</p>
         ) : (
-          <div className="chart-container">
-            <svg viewBox={`0 0 ${CHART_W} ${CHART_H}`} className="chart-svg">
-              {/* Grid lines */}
-              {[0, 0.25, 0.5, 0.75, 1].map(frac => {
-                const y = PAD_T + plotH * (1 - frac);
+          <div className="chart-scroll" style={{ overflowX: 'auto' }}>
+            <svg viewBox={`0 0 ${W} ${H}`} style={{ width: `${W}px`, minWidth: '100%' }}>
+              {/* Grid horizontal per variable */}
+              {visibleVars.filter(v => varData[v.id]).map((v, vi) => {
+                const range = yRanges[v.id];
+                const yOffset = (vi * (plotH / visibleVars.length));
+                const segH = plotH / visibleVars.length;
                 return (
-                  <g key={frac}>
-                    <line x1={PAD_L} y1={y} x2={CHART_W - PAD_R} y2={y} stroke="#1e293b" strokeWidth="1" />
-                    <text x={PAD_L - 5} y={y + 4} textAnchor="end" fill="#64748b" fontSize="8">
-                      {(vMin + (vMax - vMin) * frac).toFixed(1)}
+                  <g key={`grid-${v.id}`}>
+                    <line x1={PAD.l} y1={PAD.t + yOffset + segH} x2={W - PAD.r} y2={PAD.t + yOffset + segH} stroke="#1e293b" strokeWidth="1" />
+                    <text x={PAD.l - 5} y={PAD.t + yOffset + segH / 2 + 4} textAnchor="end" fill="#64748b" fontSize="8">
+                      {range.min.toFixed(1)}
+                    </text>
+                    <text x={PAD.l - 5} y={PAD.t + yOffset + 4} textAnchor="end" fill="#64748b" fontSize="8">
+                      {range.max.toFixed(1)}
                     </text>
                   </g>
                 );
               })}
 
-              {/* Lines per variable */}
-              {Object.entries(pointsByVar).map(([varId, data], idx) => {
-                const color = colors[idx % colors.length];
-                if (data.pts.length < 2) return null;
-                const pathD = data.pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
+              {/* Time axis ticks */}
+              {ticks.map((t, i) => (
+                <g key={`tick-${i}`}>
+                  <line x1={toX(t.ts)} y1={H - PAD.b} x2={toX(t.ts)} y2={H - PAD.b + 5} stroke="#475569" />
+                  <text x={toX(t.ts)} y={H - PAD.b + 18} textAnchor="middle" fill="#64748b" fontSize="9">
+                    {t.label}
+                  </text>
+                </g>
+              ))}
+
+              {/* Lines */}
+              {visibleVars.filter(v => varData[v.id] && varData[v.id].pts.length >= 2).map((v, vi) => {
+                const data = varData[v.id];
+                const range = yRanges[v.id];
+                const yOffset = (vi * (plotH / visibleVars.length));
+                const segH = plotH / visibleVars.length;
+                const color = COLORS[vi % COLORS.length];
+
+                const toY = (val: number) => PAD.t + yOffset + segH - ((val - range.min) / (range.max - range.min)) * segH;
+
+                const pathD = data.pts
+                  .filter(p => p.ts >= viewStart && p.ts <= viewEnd)
+                  .map((p, i) => `${i === 0 ? 'M' : 'L'} ${toX(p.ts)} ${toY(p.value)}`)
+                  .join(' ');
+
                 return (
-                  <g key={varId}>
-                    <path d={pathD} fill="none" stroke={color} strokeWidth="1.5" opacity="0.8" />
-                    {/* Legend dot + name */}
-                    <circle cx={PAD_L + 10 + idx * 130} cy={CHART_H - 5} r="4" fill={color} />
-                    <text x={PAD_L + 18 + idx * 130} y={CHART_H - 1} fill="#94a3b8" fontSize="7">
-                      {data.name.length > 15 ? data.name.slice(0, 14) + '…' : data.name}
+                  <g key={`line-${v.id}`}>
+                    <path d={pathD} fill="none" stroke={color} strokeWidth="1.5" opacity="0.85" />
+                    {/* Legend */}
+                    <rect x={W - PAD.r - 180} y={PAD.t + vi * 16} width="8" height="8" fill={color} rx="1" />
+                    <text x={W - PAD.r - 168} y={PAD.t + vi * 16 + 8} fill="#94a3b8" fontSize="8">
+                      {data.name}
                     </text>
                   </g>
                 );

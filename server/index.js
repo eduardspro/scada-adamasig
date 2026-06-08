@@ -471,7 +471,7 @@ app.get('/api/variables/:id/history', authMiddleware, async (req, res) => {
 
 // POST /api/variables/history-batch — historial múltiple
 app.post('/api/variables/history-batch', authMiddleware, async (req, res) => {
-  const { variable_ids } = req.body;
+  const { variable_ids, from, to } = req.body;
   if (!variable_ids || !Array.isArray(variable_ids) || variable_ids.length === 0) {
     return res.status(400).json({ error: 'variable_ids (array) requerido' });
   }
@@ -485,20 +485,27 @@ app.post('/api/variables/history-batch', authMiddleware, async (req, res) => {
     );
     const validIds = check.rows.map(r => r.id);
 
-    const result = await pool.query(
-      'SELECT variable_id, value, read_at FROM variable_history WHERE variable_id = ANY($1) ORDER BY read_at DESC LIMIT 2000',
-      [validIds]
-    );
+    let query = 'SELECT variable_id, value, read_at FROM variable_history WHERE variable_id = ANY($1)';
+    const params = [validIds];
+    let idx = 2;
+
+    if (from) {
+      query += ` AND read_at >= $${idx++}`;
+      params.push(from);
+    }
+    if (to) {
+      query += ` AND read_at <= $${idx++}`;
+      params.push(to);
+    }
+    query += ' ORDER BY read_at ASC LIMIT 5000';
+
+    const result = await pool.query(query, params);
 
     // Group by variable_id
     const grouped = {};
     for (const row of result.rows) {
       if (!grouped[row.variable_id]) grouped[row.variable_id] = [];
       grouped[row.variable_id].push({ value: row.value, read_at: row.read_at });
-    }
-    // Reverse each to chronological order
-    for (const key of Object.keys(grouped)) {
-      grouped[key].reverse();
     }
     return res.json(grouped);
   } catch (err) {
