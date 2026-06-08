@@ -119,8 +119,8 @@ export default function ReactorPage() {
     if (tMin === tMax) { tMin -= 60000; tMax += 60000; }
   }
 
-  const PAD = { l: 60, r: 20, t: 10, b: 30 };
-  const baseW = 900, baseH = 380;
+  const PAD = { l: 60, r: 20, t: 8, b: 22 };
+  const baseW = 900, baseH = 350;
   const W = baseW * zoom, H = baseH;
   const plotW = W - PAD.l - PAD.r, plotH = H - PAD.t - PAD.b;
   const timeRange = tMax - tMin || 1;
@@ -441,7 +441,7 @@ export default function ReactorPage() {
               {ticks.map((t, i) => (
                 <g key={`tick-${i}`}>
                   <line x1={toX(t.ts)} y1={H - PAD.b} x2={toX(t.ts)} y2={H - PAD.b + 5} stroke="#475569" />
-                  <text x={toX(t.ts)} y={H - PAD.b + 14} textAnchor="middle" fill="#64748b" fontSize="9">{t.label}</text>
+                  <text x={toX(t.ts)} y={H - PAD.b + 12} textAnchor="middle" fill="#64748b" fontSize="9">{t.label}</text>
                 </g>
               ))}
               {visibleVars.filter(v => varData[v.id] && varData[v.id].pts.length >= 2).map((v, vi) => {
