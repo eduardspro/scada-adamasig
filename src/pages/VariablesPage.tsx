@@ -94,11 +94,11 @@ export default function VariablesPage({ user, onLogout }: Props) {
 
   useEffect(() => { load(); }, []);
 
-  // Auto-polling: read all enabled variables periodically (every 1s)
+  // Refresh display desde DB cada 2s (read-all ya corre en Layout)
   useEffect(() => {
     const interval = setInterval(async () => {
       try {
-        const updated = await api.post<Variable[]>('/api/variables/read-all', {});
+        const updated = await api.get<Variable[]>('/api/variables');
         if (updated.length === 0) return;
         setVariables(prev => prev.map(v => {
           const match = updated.find(u => u.id === v.id);
@@ -107,9 +107,9 @@ export default function VariablesPage({ user, onLogout }: Props) {
       } catch {
         // Silently ignore polling errors
       }
-    }, 1000);
+    }, 2000);
     return () => clearInterval(interval);
-  }, []); // Run once on mount — uses functional setState to avoid stale closure
+  }, []);
 
   const selectedConn = connections.find(c => c.id === Number(connId));
   const connType = selectedConn?.type || '';

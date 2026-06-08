@@ -1,8 +1,18 @@
 import { NavLink, Outlet } from 'react-router-dom';
+import { useEffect } from 'react';
+import { api } from '../api';
 
 export default function Layout() {
   const linkClass = ({ isActive }: { isActive: boolean }) =>
     `nav-link ${isActive ? 'active' : ''}`;
+
+  // Polling global: lee todas las variables del PLC cada 1s
+  useEffect(() => {
+    const interval = setInterval(() => {
+      api.post('/api/variables/read-all', {}).catch(() => {});
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <div className="app-layout">
