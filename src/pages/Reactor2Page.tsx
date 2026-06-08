@@ -31,7 +31,6 @@ function toLocalISO(date: Date): string {
 export default function Reactor2Page() {
   const [variables, setVariables] = useState<Variable[]>([]);
   const [history, setHistory] = useState<Record<number, HistoryPoint[]>>({});
-  const [visibleIds, setVisibleIds] = useState<Set<number>>(new Set());
   const [error, setError] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
@@ -46,7 +45,7 @@ export default function Reactor2Page() {
   useEffect(() => {
     api.get<Variable[]>('/api/variables').then(vars => {
       const f = vars.filter(v => v.group === GROUP);
-      setVariables(f); setVisibleIds(new Set(f.map(v => v.id))); loadHistory(f);
+      setVariables(f); loadHistory(f);
     }).catch(() => setError('Error al cargar variables'));
   }, []);
 
@@ -71,9 +70,7 @@ export default function Reactor2Page() {
     } catch { /* ignore */ }
   }, [variables, dateFrom, dateTo]);
 
-  const toggleVar = (id: number) => setVisibleIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
-  const selectAll = () => setVisibleIds(new Set(variables.map(v => v.id)));
-  const selectNone = () => setVisibleIds(new Set());
+  const visibleVars = variables;
 
   const setRange = (hours: number) => {
     const now = new Date();
@@ -82,7 +79,6 @@ export default function Reactor2Page() {
   };
 
   // Build Chart.js datasets
-  const visibleVars = variables.filter(v => visibleIds.has(v.id));
   const datasets = visibleVars.map((v, i) => {
     const pts = (history[v.id] || [])
       .map(p => ({ x: new Date(p.read_at).getTime(), y: parseFloat(p.value) }))
@@ -139,7 +135,7 @@ export default function Reactor2Page() {
 
   // Export
   const openExport = () => {
-    setExportVarIds(new Set(visibleIds));
+    setExportVarIds(new Set(variables.map(v => v.id)));
     setExportFrom(dateFrom); setExportTo(dateTo); setShowExport(true);
   };
   const doExport = async () => {
@@ -218,19 +214,6 @@ export default function Reactor2Page() {
           <div className="ctrl-sep"/>
           <button onClick={openExport} className="btn-export">📥 Exportar</button>
         </div>
-      </div>
-
-      {/* Variable toggles */}
-      <div className="var-toggles">
-        <button onClick={selectAll} className="btn-toggle">Todos</button>
-        <button onClick={selectNone} className="btn-toggle">Ninguno</button>
-        {variables.map((v, i) => (
-          <label key={v.id} className="var-check" style={{ color: COLORS[i % COLORS.length] }}>
-            <input type="checkbox" checked={visibleIds.has(v.id)} onChange={() => toggleVar(v.id)}/>
-            <span className="var-dot" style={{ background: COLORS[i % COLORS.length] }}/>
-            {v.name.length > 28 ? v.name.slice(0, 27) + '\u2026' : v.name}
-          </label>
-        ))}
       </div>
 
       {/* Chart.js */}
