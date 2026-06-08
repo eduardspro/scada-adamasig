@@ -61,8 +61,8 @@ export default function Reactor2Page() {
     if (vlist.length === 0) return;
     try {
       const body: Record<string, unknown> = { variable_ids: vlist.map(v => v.id) };
-      if (dateFrom) body.from = dateFrom + ':00';
-      if (dateTo) body.to = dateTo + ':00';
+      if (dateFrom) body.from = new Date(dateFrom + ':00').toISOString();
+      if (dateTo) body.to = new Date(dateTo + ':00').toISOString();
       const data = await api.post<Record<string, HistoryPoint[]>>('/api/variables/history-batch', body);
       const p: Record<number, HistoryPoint[]> = {};
       for (const [k, pts] of Object.entries(data)) p[Number(k)] = pts;
@@ -144,8 +144,8 @@ export default function Reactor2Page() {
       const vlist = variables.filter(v => exportVarIds.has(v.id));
       const ids = vlist.map(v => v.id);
       const body: Record<string, unknown> = { variable_ids: ids };
-      if (exportFrom) body.from = exportFrom + ':00';
-      if (exportTo) body.to = exportTo + ':00';
+      if (exportFrom) body.from = new Date(exportFrom + ':00').toISOString();
+      if (exportTo) body.to = new Date(exportTo + ':00').toISOString();
       const data = await api.post<Record<string, HistoryPoint[]>>('/api/variables/history-batch', body);
       const tMap: Record<string, Record<number, string>> = {};
       for (const [key, pts] of Object.entries(data))
