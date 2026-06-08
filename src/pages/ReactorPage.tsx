@@ -8,6 +8,8 @@ interface Variable {
   value: string | null;
   data_type: string;
   group: string;
+  ini: number | null;
+  fin: number | null;
 }
 
 interface HistoryPoint {
@@ -127,11 +129,16 @@ export default function ReactorPage() {
   const viewStart = tMin - panX, viewEnd = tMax - panX;
   const viewRange = viewEnd - viewStart;
   const toX = (ts: number) => PAD.l + ((ts - viewStart) / viewRange) * plotW;
-
+  // Y-axis per variable — usar ini/fin si están definidos, sino auto
   const yRanges: Record<number, { min: number; max: number }> = {};
   for (const [id, data] of Object.entries(varData)) {
-    const pad = (data.max - data.min) * 0.15 || 1;
-    yRanges[Number(id)] = { min: data.min - pad, max: data.max + pad };
+    const v = visibleVars.find(v => v.id === Number(id));
+    if (v && v.ini !== null && v.fin !== null) {
+      yRanges[Number(id)] = { min: v.ini!, max: v.fin! };
+    } else {
+      const pad = (data.max - data.min) * 0.15 || 1;
+      yRanges[Number(id)] = { min: data.min - pad, max: data.max + pad };
+    }
   }
 
   const ticks: { ts: number; label: string }[] = [];

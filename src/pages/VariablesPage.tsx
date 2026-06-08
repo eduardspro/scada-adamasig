@@ -25,6 +25,8 @@ interface Variable {
   historize: boolean;
   group: string;
   description: string;
+  ini: number | null;
+  fin: number | null;
   connection_name: string;
   connection_type: string;
   created_at: string;
@@ -47,6 +49,8 @@ const SAMPLE_TIMES = [
   { label: '1min', value: 60000 },
 ];
 
+const NUMERIC_TYPES = ['uint8', 'int8', 'uint16', 'int16', 'uint32', 'int32', 'float32', 'float64', 'real'];
+
 export default function VariablesPage({ user, onLogout }: Props) {
   const [connections, setConnections] = useState<Connection[]>([]);
   const [variables, setVariables] = useState<Variable[]>([]);
@@ -67,6 +71,8 @@ export default function VariablesPage({ user, onLogout }: Props) {
   const [byteOrder, setByteOrder] = useState('big');
   const [group, setGroup] = useState('main');
   const [description, setDescription] = useState('');
+  const [ini, setIni] = useState('');
+  const [fin, setFin] = useState('');
 
   // Editing state
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -75,6 +81,8 @@ export default function VariablesPage({ user, onLogout }: Props) {
   const [editDataType, setEditDataType] = useState('uint16');
   const [editGroup, setEditGroup] = useState('main');
   const [editDescription, setEditDescription] = useState('');
+  const [editIni, setEditIni] = useState('');
+  const [editFin, setEditFin] = useState('');
   const [readLoading, setReadLoading] = useState<Record<number, boolean>>({});
 
   async function load() {
@@ -177,6 +185,8 @@ export default function VariablesPage({ user, onLogout }: Props) {
         config: buildConfig(),
         group: group || 'main',
         description: description || '',
+        ini: ini || null,
+        fin: fin || null,
       });
       setVariables([created, ...variables]);
       setName('');
@@ -184,6 +194,8 @@ export default function VariablesPage({ user, onLogout }: Props) {
       setDataType('uint16');
       setGroup('main');
       setDescription('');
+      setIni('');
+      setFin('');
       setDb('1'); setOffset('0'); setBit(''); setByteOrder('big');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error');
@@ -227,6 +239,8 @@ export default function VariablesPage({ user, onLogout }: Props) {
     setEditDataType(v.data_type);
     setEditGroup(v.group || 'main');
     setEditDescription(v.description || '');
+    setEditIni(v.ini !== null && v.ini !== undefined ? String(v.ini) : '');
+    setEditFin(v.fin !== null && v.fin !== undefined ? String(v.fin) : '');
   }
 
   function cancelEdit() {
@@ -242,6 +256,8 @@ export default function VariablesPage({ user, onLogout }: Props) {
         data_type: editDataType,
         group: editGroup || 'main',
         description: editDescription || '',
+        ini: editIni || null,
+        fin: editFin || null,
         config: variables.find(v => v.id === id)?.config || {},
       });
       setVariables(variables.map(x => x.id === id ? { ...x, ...updated } : x));
@@ -349,6 +365,20 @@ export default function VariablesPage({ user, onLogout }: Props) {
                 Grupo
                 <input value={group} onChange={e => setGroup(e.target.value)} placeholder="main" className="group-input" />
               </label>
+
+              {/* Ini/Fin solo para tipos numéricos */}
+              {NUMERIC_TYPES.includes(dataType) && (
+                <>
+                  <label>
+                    Ini
+                    <input type="number" value={ini} onChange={e => setIni(e.target.value)} placeholder="0" step="any" className="small-input" />
+                  </label>
+                  <label>
+                    Fin
+                    <input type="number" value={fin} onChange={e => setFin(e.target.value)} placeholder="100" step="any" className="small-input" />
+                  </label>
+                </>
+              )}
 
               {/* Modbus: address + byte order */}
               {connType === 'modbus' && (

@@ -223,7 +223,7 @@ app.get('/api/variables', authMiddleware, async (req, res) => {
   try {
     let query = `SELECT v.id, v.connection_id, v.name, v.address, v.data_type, v.config,
                         v.enabled, v.sample_time_ms, v.value, v.last_read_at, v.historize,
-                        v."group", v.description, v.created_at, v.updated_at,
+                        v."group", v.description, v.ini, v.fin, v.created_at, v.updated_at,
                         c.name as connection_name, c.type as connection_type
                  FROM variables v
                  JOIN connections c ON v.connection_id = c.id
@@ -244,7 +244,7 @@ app.get('/api/variables', authMiddleware, async (req, res) => {
 
 // POST /api/variables
 app.post('/api/variables', authMiddleware, async (req, res) => {
-  const { connection_id, name, address, data_type, config, enabled, sample_time_ms, historize, group, description } = req.body;
+  const { connection_id, name, address, data_type, config, enabled, sample_time_ms, historize, group, description, ini, fin } = req.body;
   if (!connection_id || !name || !address) {
     return res.status(400).json({ error: 'connection_id, name y address son requeridos' });
   }
@@ -258,15 +258,17 @@ app.post('/api/variables', authMiddleware, async (req, res) => {
       return res.status(404).json({ error: 'Conexión no encontrada' });
     }
     const result = await pool.query(
-      `INSERT INTO variables (connection_id, name, address, data_type, config, enabled, sample_time_ms, historize, "group", description)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-       RETURNING id, connection_id, name, address, data_type, config, enabled, sample_time_ms, value, last_read_at, historize, "group", description, created_at`,
+      `INSERT INTO variables (connection_id, name, address, data_type, config, enabled, sample_time_ms, historize, "group", description, ini, fin)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+       RETURNING id, connection_id, name, address, data_type, config, enabled, sample_time_ms, value, last_read_at, historize, "group", description, ini, fin, created_at`,
       [connection_id, name, address, data_type || 'uint16', JSON.stringify(config || {}),
        enabled !== undefined ? enabled : true,
        sample_time_ms || 1000,
        historize !== undefined ? historize : false,
        group || 'main',
-       description || '']
+       description || '',
+       ini !== undefined && ini !== '' ? Number(ini) : null,
+       fin !== undefined && fin !== '' ? Number(fin) : null]
     );
     return res.status(201).json(result.rows[0]);
   } catch (err) {
@@ -296,7 +298,7 @@ app.delete('/api/variables/:id', authMiddleware, async (req, res) => {
 
 // PATCH /api/variables/:id — toggle enabled, update value, sample_time, historize
 app.patch('/api/variables/:id', authMiddleware, async (req, res) => {
-  const { enabled, value, sample_time_ms, historize, group, description } = req.body;
+  const { enabled, value, sample_time_ms, historize, group, description, ini, fin } = req.body;
   try {
     // Verify variable belongs to user's connections
     const check = await pool.query(
@@ -343,6 +345,14 @@ app.patch('/api/variables/:id', authMiddleware, async (req, res) => {
       sets.push(`description=$${idx++}`);
       params.push(description);
     }
+    if (ini !== undefined) {
+      sets.push(`ini=$${idx++}`);
+      params.push(ini !== '' ? Number(ini) : null);
+    }
+    if (fin !== undefined) {
+      sets.push(`fin=$${idx++}`);
+      params.push(fin !== '' ? Number(fin) : null);
+    }
 
     if (sets.length === 0) {
       return res.status(400).json({ error: 'Nada que actualizar' });
@@ -353,7 +363,7 @@ app.patch('/api/variables/:id', authMiddleware, async (req, res) => {
 
     const result = await pool.query(
       `UPDATE variables SET ${sets.join(', ')} WHERE id=$${idx}
-       RETURNING id, connection_id, name, address, data_type, config, enabled, sample_time_ms, value, last_read_at, historize, "group", description, created_at, updated_at`,
+       RETURNING id, connection_id, name, address, data_type, config, enabled, sample_time_ms, value, last_read_at, historize, "group", description, ini, fin, created_at, updated_at`,
       params
     );
 
@@ -374,7 +384,7 @@ app.patch('/api/variables/:id', authMiddleware, async (req, res) => {
 
 // PUT /api/variables/:id — full update (edit)
 app.put('/api/variables/:id', authMiddleware, async (req, res) => {
-  const { name, address, data_type, config, group, description } = req.body;
+  const { name, address, data_type, config, group, description, ini, fin } = req.body;
   if (!name || !address) {
     return res.status(400).json({ error: 'name y address son requeridos' });
   }
@@ -389,10 +399,10 @@ app.put('/api/variables/:id', authMiddleware, async (req, res) => {
       return res.status(404).json({ error: 'Variable no encontrada' });
     }
     const result = await pool.query(
-      `UPDATE variables SET name=$1, address=$2, data_type=$3, config=$4, "group"=$5, description=$6, updated_at=NOW()
-       WHERE id=$7
-       RETURNING id, connection_id, name, address, data_type, config, enabled, sample_time_ms, value, last_read_at, historize, "group", description, created_at, updated_at`,
-      [name, address, data_type || 'uint16', JSON.stringify(config || {}), group || 'main', description || '', req.params.id]
+      `UPDATE variables SET name=$1, address=$2, data_type=$3, config=$4, "group"=$5, description=$6, ini=$7, fin=$8, updated_at=NOW()
+       WHERE id=$9
+       RETURNING id, connection_id, name, address, data_type, config, enabled, sample_time_ms, value, last_read_at, historize, "group", description, ini, fin, created_at, updated_at`,
+      [name, address, data_type || 'uint16', JSON.stringify(config || {}), group || 'main', description || '', ini !== undefined && ini !== '' ? Number(ini) : null, fin !== undefined && fin !== '' ? Number(fin) : null, req.params.id]
     );
     return res.json(result.rows[0]);
   } catch (err) {
@@ -433,7 +443,7 @@ app.post('/api/variables/:id/read', authMiddleware, async (req, res) => {
     const result = await pool.query(
       `UPDATE variables SET value=$1, last_read_at=NOW(), updated_at=NOW()
        WHERE id=$2
-       RETURNING id, connection_id, name, address, data_type, config, enabled, sample_time_ms, value, last_read_at, historize, "group", description, created_at, updated_at`,
+       RETURNING id, connection_id, name, address, data_type, config, enabled, sample_time_ms, value, last_read_at, historize, "group", description, ini, fin, created_at, updated_at`,
       [newValue, req.params.id]
     );
 
@@ -570,7 +580,7 @@ app.post('/api/variables/read-all', authMiddleware, async (req, res) => {
         const result = await pool.query(
           `UPDATE variables SET value=$1, last_read_at=NOW(), updated_at=NOW()
            WHERE id=$2
-           RETURNING id, connection_id, name, address, data_type, config, enabled, sample_time_ms, value, last_read_at, historize, "group", description, created_at, updated_at`,
+           RETURNING id, connection_id, name, address, data_type, config, enabled, sample_time_ms, value, last_read_at, historize, "group", description, ini, fin, created_at, updated_at`,
           [r.value, r.id]
         );
         updated.push(result.rows[0]);
