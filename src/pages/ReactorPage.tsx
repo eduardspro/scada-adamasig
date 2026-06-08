@@ -225,41 +225,143 @@ export default function ReactorPage() {
         <span className="subtitle">{variables.length} variables · grupo: {GROUP}</span>
       </header>
 
-      {/* Esquema SVG */}
+      {/* Esquema SVG — 5 tanques P&ID */}
       <div className="reactor-diagram">
-        <svg viewBox="0 0 800 500" className="reactor-svg">
-          <line x1="0" y1="140" x2="240" y2="140" stroke="#94a3b8" strokeWidth="8" />
-          <line x1="240" y1="140" x2="280" y2="200" stroke="#94a3b8" strokeWidth="8" />
-          <rect x="200" y="128" width="16" height="24" rx="2" fill="#64748b" />
-          <line x1="208" y1="128" x2="208" y2="118" stroke="#94a3b8" strokeWidth="3" />
-          <rect x="260" y="200" width="220" height="240" rx="10" fill="#1e293b" stroke="#475569" strokeWidth="3" />
-          <rect x="250" y="250" width="240" height="160" rx="8" fill="none" stroke="#334155" strokeWidth="2" strokeDasharray="6,3" />
-          <rect x="355" y="150" width="30" height="40" rx="4" fill="#334155" stroke="#475569" strokeWidth="2" />
-          <circle cx="370" cy="135" r="12" fill="none" stroke="#475569" strokeWidth="2" />
-          <line x1="370" y1="190" x2="370" y2="360" stroke="#64748b" strokeWidth="4" />
-          <line x1="340" y1="330" x2="400" y2="330" stroke="#64748b" strokeWidth="4" />
-          <line x1="345" y1="360" x2="395" y2="360" stroke="#64748b" strokeWidth="4" />
-          <line x1="480" y1="380" x2="580" y2="380" stroke="#94a3b8" strokeWidth="8" />
-          <line x1="580" y1="380" x2="620" y2="340" stroke="#94a3b8" strokeWidth="8" />
-          <line x1="620" y1="340" x2="800" y2="340" stroke="#94a3b8" strokeWidth="8" />
-          <rect x="530" y="368" width="16" height="24" rx="2" fill="#64748b" />
-          <line x1="538" y1="368" x2="538" y2="358" stroke="#94a3b8" strokeWidth="3" />
-          <line x1="0" y1="380" x2="200" y2="380" stroke="#94a3b8" strokeWidth="8" />
-          <line x1="200" y1="380" x2="240" y2="400" stroke="#94a3b8" strokeWidth="8" />
-          <line x1="240" y1="400" x2="260" y2="400" stroke="#94a3b8" strokeWidth="8" />
-          <rect x="160" y="368" width="16" height="24" rx="2" fill="#64748b" />
-          <line x1="168" y1="368" x2="168" y2="358" stroke="#94a3b8" strokeWidth="3" />
-          <line x1="380" y1="200" x2="380" y2="140" stroke="#94a3b8" strokeWidth="6" />
-          <line x1="380" y1="140" x2="550" y2="60" stroke="#94a3b8" strokeWidth="6" />
-          <line x1="550" y1="60" x2="800" y2="60" stroke="#94a3b8" strokeWidth="6" />
-          <rect x="490" y="88" width="16" height="24" rx="2" fill="#64748b" />
-          <line x1="498" y1="88" x2="498" y2="78" stroke="#94a3b8" strokeWidth="3" />
-          <rect x="560" y="40" width="30" height="80" rx="4" fill="#1e293b" stroke="#475569" strokeWidth="2" />
-          <circle cx="300" cy="310" r="14" fill="none" stroke="#22c55e" strokeWidth="2" />
-          <circle cx="440" cy="310" r="14" fill="none" stroke="#22c55e" strokeWidth="2" />
-          <circle cx="370" cy="430" r="14" fill="none" stroke="#f59e0b" strokeWidth="2" />
-          <circle cx="120" cy="380" r="22" fill="none" stroke="#475569" strokeWidth="3" />
-          <circle cx="120" cy="380" r="6" fill="#64748b" />
+        <svg viewBox="0 0 1000 450" className="reactor-svg">
+          <defs>
+            <linearGradient id="tankGrad" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stopColor="#1e293b" />
+              <stop offset="30%" stopColor="#334155" />
+              <stop offset="70%" stopColor="#334155" />
+              <stop offset="100%" stopColor="#1e293b" />
+            </linearGradient>
+          </defs>
+
+          {/* ── TANQUE 1: Vertical izquierdo (Alimentación) ── */}
+          <ellipse cx="80" cy="80" rx="40" ry="14" fill="none" stroke="#475569" strokeWidth="2" />
+          <rect x="40" y="80" width="80" height="140" fill="url(#tankGrad)" stroke="#475569" strokeWidth="2" />
+          <ellipse cx="80" cy="220" rx="40" ry="14" fill="#1e293b" stroke="#475569" strokeWidth="2" />
+          {/* Nivel interno */}
+          <rect x="44" y="130" width="72" height="88" fill="#0f3460" opacity="0.6" stroke="none" />
+          <ellipse cx="80" cy="218" rx="36" ry="10" fill="#0f3460" opacity="0.4" stroke="none" />
+
+          {/* ── TANQUE 2: Vertical izquierdo (Recuperado) ── */}
+          <ellipse cx="180" cy="80" rx="40" ry="14" fill="none" stroke="#475569" strokeWidth="2" />
+          <rect x="140" y="80" width="80" height="140" fill="url(#tankGrad)" stroke="#475569" strokeWidth="2" />
+          <ellipse cx="180" cy="220" rx="40" ry="14" fill="#1e293b" stroke="#475569" strokeWidth="2" />
+          <rect x="144" y="110" width="72" height="108" fill="#0f3460" opacity="0.6" stroke="none" />
+          <ellipse cx="180" cy="218" rx="36" ry="10" fill="#0f3460" opacity="0.4" stroke="none" />
+
+          {/* ── TANQUE 3: REACTOR principal (centro, más grande) ── */}
+          <ellipse cx="500" cy="40" rx="70" ry="20" fill="none" stroke="#475569" strokeWidth="2.5" />
+          <rect x="430" y="40" width="140" height="300" fill="url(#tankGrad)" stroke="#475569" strokeWidth="2.5" />
+          <ellipse cx="500" cy="340" rx="70" ry="22" fill="#1e293b" stroke="#475569" strokeWidth="2.5" />
+          {/* Chaqueta */}
+          <rect x="420" y="100" width="160" height="200" rx="8" fill="none" stroke="#334155" strokeWidth="1.5" strokeDasharray="5,3" />
+          {/* Nivel interno */}
+          <rect x="434" y="140" width="132" height="198" fill="#0f3460" opacity="0.5" stroke="none" />
+          <ellipse cx="500" cy="338" rx="66" ry="18" fill="#0f3460" opacity="0.3" stroke="none" />
+          {/* Agitador */}
+          <rect x="490" y="0" width="20" height="30" rx="3" fill="#334155" stroke="#475569" strokeWidth="1.5" />
+          <circle cx="500" cy="0" r="16" fill="none" stroke="#475569" strokeWidth="2" />
+          <line x1="500" y1="30" x2="500" y2="280" stroke="#64748b" strokeWidth="4" />
+          <line x1="460" y1="240" x2="540" y2="240" stroke="#64748b" strokeWidth="4" />
+          <line x1="465" y1="270" x2="535" y2="270" stroke="#64748b" strokeWidth="4" />
+
+          {/* ── TANQUE 4: Horizontal (Condensador/Intercambiador) ── */}
+          <ellipse cx="500" cy="40" rx="18" ry="18" fill="none" stroke="#475569" strokeWidth="2" />
+          <rect x="420" y="22" width="160" height="36" rx="18" fill="url(#tankGrad)" stroke="#475569" strokeWidth="2" />
+          <ellipse cx="500" cy="40" rx="18" ry="18" fill="none" stroke="#475569" strokeWidth="2" />
+          {/* Interno */}
+          <line x1="440" y1="30" x2="440" y2="50" stroke="#94a3b8" strokeWidth="1" />
+          <line x1="460" y1="28" x2="460" y2="52" stroke="#94a3b8" strokeWidth="1" />
+          <line x1="480" y1="28" x2="480" y2="52" stroke="#94a3b8" strokeWidth="1" />
+
+          {/* ── TANQUE 5: Vertical derecho (Producto) ── */}
+          <ellipse cx="750" cy="80" rx="40" ry="14" fill="none" stroke="#475569" strokeWidth="2" />
+          <rect x="710" y="80" width="80" height="140" fill="url(#tankGrad)" stroke="#475569" strokeWidth="2" />
+          <ellipse cx="750" cy="220" rx="40" ry="14" fill="#1e293b" stroke="#475569" strokeWidth="2" />
+          <rect x="714" y="150" width="72" height="68" fill="#0f3460" opacity="0.6" stroke="none" />
+          <ellipse cx="750" cy="218" rx="36" ry="10" fill="#0f3460" opacity="0.4" stroke="none" />
+
+          {/* ── TANQUE 6: Vertical derecho (Recuperado 2) ── */}
+          <ellipse cx="860" cy="80" rx="40" ry="14" fill="none" stroke="#475569" strokeWidth="2" />
+          <rect x="820" y="80" width="80" height="140" fill="url(#tankGrad)" stroke="#475569" strokeWidth="2" />
+          <ellipse cx="860" cy="220" rx="40" ry="14" fill="#1e293b" stroke="#475569" strokeWidth="2" />
+          <rect x="824" y="120" width="72" height="98" fill="#0f3460" opacity="0.6" stroke="none" />
+          <ellipse cx="860" cy="218" rx="36" ry="10" fill="#0f3460" opacity="0.4" stroke="none" />
+
+          {/* ═══ TUBERÍAS ═══ */}
+
+          {/* T1 → T2 (interconexión superior) */}
+          <line x1="120" y1="100" x2="140" y2="100" stroke="#94a3b8" strokeWidth="5" />
+
+          {/* T1 + T2 → Reactor (alimentación combinada) */}
+          <line x1="120" y1="220" x2="220" y2="220" stroke="#94a3b8" strokeWidth="5" />
+          <line x1="220" y1="220" x2="220" y2="280" stroke="#94a3b8" strokeWidth="5" />
+          <line x1="220" y1="320" x2="220" y2="320" stroke="#94a3b8" strokeWidth="5" />
+          <line x1="220" y1="280" x2="430" y2="280" stroke="#94a3b8" strokeWidth="5" />
+          {/* Válvula T2 → reactor */}
+          <polygon points="280,272 290,280 280,288" fill="#64748b" />
+          <line x1="280" y1="280" x2="280" y2="268" stroke="#94a3b8" strokeWidth="2" />
+
+          {/* Bomba alimentación */}
+          <circle cx="340" cy="280" r="14" fill="none" stroke="#475569" strokeWidth="2.5" />
+          <circle cx="340" cy="280" r="4" fill="#64748b" />
+          <polygon points="326,274 326,286 340,280" fill="#64748b" opacity="0.6" />
+
+          {/* Reactor → Condensador (vapor arriba) */}
+          <line x1="500" y1="100" x2="500" y2="58" stroke="#94a3b8" strokeWidth="4" />
+
+          {/* Condensador → T5 (destilado derecha) */}
+          <line x1="580" y1="40" x2="710" y2="40" stroke="#94a3b8" strokeWidth="4" />
+          <line x1="710" y1="40" x2="710" y2="80" stroke="#94a3b8" strokeWidth="4" />
+          {/* Válvula condensador */}
+          <polygon points="640,32 650,40 640,48" fill="#64748b" />
+          <line x1="640" y1="40" x2="640" y2="30" stroke="#94a3b8" strokeWidth="2" />
+
+          {/* T5 → T6 (interconexión) */}
+          <line x1="790" y1="100" x2="820" y2="100" stroke="#94a3b8" strokeWidth="4" />
+
+          {/* Reactor fondo → T5 (producto inferior) */}
+          <line x1="570" y1="340" x2="710" y2="340" stroke="#94a3b8" strokeWidth="5" />
+          <line x1="710" y1="340" x2="710" y2="220" stroke="#94a3b8" strokeWidth="5" />
+          {/* Válvula fondo reactor */}
+          <polygon points="630,332 640,340 630,348" fill="#64748b" />
+          <line x1="630" y1="340" x2="630" y2="328" stroke="#94a3b8" strokeWidth="2" />
+
+          {/* Bomba salida */}
+          <circle cx="680" cy="340" r="14" fill="none" stroke="#475569" strokeWidth="2.5" />
+          <circle cx="680" cy="340" r="4" fill="#64748b" />
+          <polygon points="666,334 666,346 680,340" fill="#64748b" opacity="0.6" />
+
+          {/* Tubería retorno condensador → T5 */}
+          <line x1="580" y1="58" x2="710" y2="58" stroke="#94a3b8" strokeWidth="3" strokeDasharray="4,2" />
+
+          {/* Conexión inferior T1 */}
+          <line x1="80" y1="220" x2="120" y2="220" stroke="#94a3b8" strokeWidth="5" />
+
+          {/* Conexiones de venteo (top tanks) */}
+          <line x1="80" y1="66" x2="80" y2="50" stroke="#334155" strokeWidth="2" />
+          <line x1="180" y1="66" x2="180" y2="50" stroke="#334155" strokeWidth="2" />
+          <line x1="750" y1="66" x2="750" y2="50" stroke="#334155" strokeWidth="2" />
+          <line x1="860" y1="66" x2="860" y2="50" stroke="#334155" strokeWidth="2" />
+
+          {/* Etiquetas pequeñas (siglas solamente) */}
+          <text x="80" y="258" textAnchor="middle" fill="#475569" fontSize="9" fontFamily="monospace">TK-01</text>
+          <text x="180" y="258" textAnchor="middle" fill="#475569" fontSize="9" fontFamily="monospace">TK-02</text>
+          <text x="500" y="378" textAnchor="middle" fill="#475569" fontSize="9" fontFamily="monospace">R-01</text>
+          <text x="750" y="258" textAnchor="middle" fill="#475569" fontSize="9" fontFamily="monospace">TK-03</text>
+          <text x="860" y="258" textAnchor="middle" fill="#475569" fontSize="9" fontFamily="monospace">TK-04</text>
+          <text x="500" y="18" textAnchor="middle" fill="#475569" fontSize="8" fontFamily="monospace">E-01</text>
+
+          {/* Indicadores (círculos de estado) */}
+          <circle cx="80" cy="160" r="8" fill="none" stroke="#22c55e" strokeWidth="1.5" />
+          <circle cx="180" cy="140" r="8" fill="none" stroke="#22c55e" strokeWidth="1.5" />
+          <circle cx="500" cy="200" r="8" fill="none" stroke="#22c55e" strokeWidth="1.5" />
+          <circle cx="500" cy="310" r="8" fill="none" stroke="#f59e0b" strokeWidth="1.5" />
+          <circle cx="750" cy="170" r="8" fill="none" stroke="#22c55e" strokeWidth="1.5" />
+          <circle cx="860" cy="150" r="8" fill="none" stroke="#22c55e" strokeWidth="1.5" />
         </svg>
       </div>
 
