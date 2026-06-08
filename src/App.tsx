@@ -3,6 +3,7 @@ import Layout from './components/Layout';
 import LoginPage from './pages/LoginPage';
 import ConnectionsPage from './pages/ConnectionsPage';
 import VariablesPage from './pages/VariablesPage';
+import ReactorPage from './pages/ReactorPage';
 import { useEffect, useState } from 'react';
 import { api } from './api';
 
@@ -48,6 +49,7 @@ export default function App() {
       >
         <Route path="/connections" element={<ConnectionsPage user={user!} onLogout={handleLogout} />} />
         <Route path="/variables" element={<VariablesPage user={user!} onLogout={handleLogout} />} />
+        <Route path="/reactor" element={<ReactorPage />} />
       </Route>
       <Route path="*" element={<Navigate to={user ? '/connections' : '/login'} />} />
     </Routes>

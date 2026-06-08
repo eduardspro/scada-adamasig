@@ -1,0 +1,37 @@
+.reactor-page { padding: 2rem; }
+
+.reactor-diagram {
+  background: #0f172a;
+  border: 1px solid #1e293b;
+  border-radius: 8px;
+  margin-bottom: 1.5rem;
+  overflow: hidden;
+}
+
+.reactor-svg {
+  width: 100%;
+  max-height: 420px;
+  display: block;
+}
+
+/* Chart */
+.reactor-chart {
+  background: #0f172a;
+  border: 1px solid #1e293b;
+  border-radius: 8px;
+  padding: 1.25rem;
+}
+
+.reactor-chart h3 {
+  font-size: 0.95rem;
+  color: #e2e8f0;
+  margin: 0 0 1rem 0;
+  font-weight: 600;
+}
+
+.chart-container { overflow-x: auto; }
+
+.chart-svg {
+  width: 100%;
+  min-width: 300px;
+}

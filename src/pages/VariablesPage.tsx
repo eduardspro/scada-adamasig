@@ -23,6 +23,7 @@ interface Variable {
   value: string | null;
   last_read_at: string | null;
   historize: boolean;
+  group: string;
   connection_name: string;
   connection_type: string;
   created_at: string;
@@ -63,12 +64,14 @@ export default function VariablesPage({ user, onLogout }: Props) {
   const [offset, setOffset] = useState('0');
   const [bit, setBit] = useState('');
   const [byteOrder, setByteOrder] = useState('big');
+  const [group, setGroup] = useState('main');
 
   // Editing state
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editName, setEditName] = useState('');
   const [editAddress, setEditAddress] = useState('');
   const [editDataType, setEditDataType] = useState('uint16');
+  const [editGroup, setEditGroup] = useState('main');
   const [readLoading, setReadLoading] = useState<Record<number, boolean>>({});
 
   async function load() {
@@ -169,11 +172,13 @@ export default function VariablesPage({ user, onLogout }: Props) {
         address: buildAddress(),
         data_type: dataType,
         config: buildConfig(),
+        group: group || 'main',
       });
       setVariables([created, ...variables]);
       setName('');
       setAddress('');
       setDataType('uint16');
+      setGroup('main');
       setDb('1'); setOffset('0'); setBit(''); setByteOrder('big');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error');
@@ -215,6 +220,7 @@ export default function VariablesPage({ user, onLogout }: Props) {
     setEditName(v.name);
     setEditAddress(v.address);
     setEditDataType(v.data_type);
+    setEditGroup(v.group || 'main');
   }
 
   function cancelEdit() {
@@ -228,6 +234,7 @@ export default function VariablesPage({ user, onLogout }: Props) {
         name: editName,
         address: editAddress,
         data_type: editDataType,
+        group: editGroup || 'main',
         config: variables.find(v => v.id === id)?.config || {},
       });
       setVariables(variables.map(x => x.id === id ? { ...x, ...updated } : x));
@@ -327,6 +334,10 @@ export default function VariablesPage({ user, onLogout }: Props) {
                   {DATA_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                 </select>
               </label>
+              <label>
+                Grupo
+                <input value={group} onChange={e => setGroup(e.target.value)} placeholder="main" className="group-input" />
+              </label>
 
               {/* Modbus: address + byte order */}
               {connType === 'modbus' && (
@@ -418,6 +429,7 @@ export default function VariablesPage({ user, onLogout }: Props) {
                 <th>Valor</th>
                 <th>Conexión</th>
                 <th>Config</th>
+                <th>Grupo</th>
                 <th>Habilitado</th>
                 <th>Muestreo</th>
                 <th>Historizar</th>
@@ -440,7 +452,7 @@ export default function VariablesPage({ user, onLogout }: Props) {
                     <td className="cell-muted">{fmtValue(v)}</td>
                     <td className="cell-muted">{v.connection_name}</td>
                     <td className="cell-muted">{fmtConfig(v)}</td>
-                    <td></td>
+                    <td><input value={editGroup} onChange={e => setEditGroup(e.target.value)} placeholder="main" /></td>
                     <td></td>
                     <td></td>
                     <td className="cell-saved">{fmtLastRead(v)}</td>
@@ -458,6 +470,7 @@ export default function VariablesPage({ user, onLogout }: Props) {
                     <td className="cell-value">{fmtValue(v)}</td>
                     <td className="cell-muted">{v.connection_name}</td>
                     <td className="cell-muted">{fmtConfig(v)}</td>
+                    <td><code>{v.group || 'main'}</code></td>
                     <td>
                       <label className="toggle-switch">
                         <input

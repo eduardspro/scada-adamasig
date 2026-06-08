@@ -36,6 +36,7 @@ CREATE TABLE IF NOT EXISTS variables (
     value TEXT,
     last_read_at TIMESTAMP,
     historize BOOLEAN DEFAULT false,
+    "group" VARCHAR(200) DEFAULT 'main',
     created_at TIMESTAMP DEFAULT NOW(),
     updated_at TIMESTAMP DEFAULT NOW()
 );
