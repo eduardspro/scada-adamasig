@@ -18,6 +18,9 @@ export default function Layout() {
           <NavLink to="/reactor" className={linkClass}>
             <span className="nav-icon">⚗️</span> Reactor 1
           </NavLink>
+          <NavLink to="/reactor2" className={linkClass}>
+            <span className="nav-icon">⚗️</span> Reactor 2
+          </NavLink>
 
         </nav>
       </aside>

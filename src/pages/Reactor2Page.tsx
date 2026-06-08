@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api';
-import './ReactorPage.css';
+import './Reactor2Page.css';
 
 interface Variable {
   id: number;
@@ -16,10 +16,10 @@ interface HistoryPoint {
   read_at: string;
 }
 
-const GROUP = 'reactor1';
-const TITLE = '⚗️ Reactor 1';
+const GROUP = 'reactor2';
+const TITLE = '⚗️ Reactor 2';
 
-export default function ReactorPage() {
+export default function Reactor2Page() {
   const [variables, setVariables] = useState<Variable[]>([]);
   const [history, setHistory] = useState<Record<number, HistoryPoint[]>>({});
   const [error, setError] = useState('');

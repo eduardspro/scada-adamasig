@@ -469,6 +469,44 @@ app.get('/api/variables/:id/history', authMiddleware, async (req, res) => {
   }
 });
 
+// POST /api/variables/history-batch — historial múltiple
+app.post('/api/variables/history-batch', authMiddleware, async (req, res) => {
+  const { variable_ids } = req.body;
+  if (!variable_ids || !Array.isArray(variable_ids) || variable_ids.length === 0) {
+    return res.status(400).json({ error: 'variable_ids (array) requerido' });
+  }
+  try {
+    // Verify all belong to user
+    const check = await pool.query(
+      `SELECT v.id FROM variables v
+       JOIN connections c ON v.connection_id = c.id
+       WHERE v.id = ANY($1) AND c.user_id = $2`,
+      [variable_ids, req.user.id]
+    );
+    const validIds = check.rows.map(r => r.id);
+
+    const result = await pool.query(
+      'SELECT variable_id, value, read_at FROM variable_history WHERE variable_id = ANY($1) ORDER BY read_at DESC LIMIT 2000',
+      [validIds]
+    );
+
+    // Group by variable_id
+    const grouped = {};
+    for (const row of result.rows) {
+      if (!grouped[row.variable_id]) grouped[row.variable_id] = [];
+      grouped[row.variable_id].push({ value: row.value, read_at: row.read_at });
+    }
+    // Reverse each to chronological order
+    for (const key of Object.keys(grouped)) {
+      grouped[key].reverse();
+    }
+    return res.json(grouped);
+  } catch (err) {
+    console.error('History batch error:', err);
+    return res.status(500).json({ error: 'Error interno' });
+  }
+});
+
 // POST /api/variables/read-all — read all enabled variables from their PLCs
 app.post('/api/variables/read-all', authMiddleware, async (req, res) => {
   try {
