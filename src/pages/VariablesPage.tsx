@@ -24,6 +24,7 @@ interface Variable {
   last_read_at: string | null;
   historize: boolean;
   group: string;
+  description: string;
   connection_name: string;
   connection_type: string;
   created_at: string;
@@ -65,6 +66,7 @@ export default function VariablesPage({ user, onLogout }: Props) {
   const [bit, setBit] = useState('');
   const [byteOrder, setByteOrder] = useState('big');
   const [group, setGroup] = useState('main');
+  const [description, setDescription] = useState('');
 
   // Editing state
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -72,6 +74,7 @@ export default function VariablesPage({ user, onLogout }: Props) {
   const [editAddress, setEditAddress] = useState('');
   const [editDataType, setEditDataType] = useState('uint16');
   const [editGroup, setEditGroup] = useState('main');
+  const [editDescription, setEditDescription] = useState('');
   const [readLoading, setReadLoading] = useState<Record<number, boolean>>({});
 
   async function load() {
@@ -173,12 +176,14 @@ export default function VariablesPage({ user, onLogout }: Props) {
         data_type: dataType,
         config: buildConfig(),
         group: group || 'main',
+        description: description || '',
       });
       setVariables([created, ...variables]);
       setName('');
       setAddress('');
       setDataType('uint16');
       setGroup('main');
+      setDescription('');
       setDb('1'); setOffset('0'); setBit(''); setByteOrder('big');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error');
@@ -221,6 +226,7 @@ export default function VariablesPage({ user, onLogout }: Props) {
     setEditAddress(v.address);
     setEditDataType(v.data_type);
     setEditGroup(v.group || 'main');
+    setEditDescription(v.description || '');
   }
 
   function cancelEdit() {
@@ -235,6 +241,7 @@ export default function VariablesPage({ user, onLogout }: Props) {
         address: editAddress,
         data_type: editDataType,
         group: editGroup || 'main',
+        description: editDescription || '',
         config: variables.find(v => v.id === id)?.config || {},
       });
       setVariables(variables.map(x => x.id === id ? { ...x, ...updated } : x));
@@ -327,6 +334,10 @@ export default function VariablesPage({ user, onLogout }: Props) {
               <label>
                 Nombre variable
                 <input value={name} onChange={e => setName(e.target.value)} placeholder="Temp. entrada" />
+              </label>
+              <label>
+                Descripción
+                <input value={description} onChange={e => setDescription(e.target.value)} placeholder="Descripción opcional" />
               </label>
               <label>
                 Tipo dato
@@ -424,6 +435,7 @@ export default function VariablesPage({ user, onLogout }: Props) {
             <thead>
               <tr>
                 <th>Variable</th>
+                <th>Descripción</th>
                 <th>Dirección</th>
                 <th>Tipo</th>
                 <th>Valor</th>
@@ -443,6 +455,7 @@ export default function VariablesPage({ user, onLogout }: Props) {
                   /* ---- EDIT ROW ---- */
                   <tr key={v.id} className="edit-row">
                     <td><input value={editName} onChange={e => setEditName(e.target.value)} /></td>
+                    <td><input value={editDescription} onChange={e => setEditDescription(e.target.value)} placeholder="Descripción" /></td>
                     <td><input value={editAddress} onChange={e => setEditAddress(e.target.value)} /></td>
                     <td>
                       <select value={editDataType} onChange={e => setEditDataType(e.target.value)}>
@@ -465,6 +478,7 @@ export default function VariablesPage({ user, onLogout }: Props) {
                   /* ---- VIEW ROW ---- */
                   <tr key={v.id} className={v.enabled ? '' : 'row-disabled'}>
                     <td><strong>{v.name}</strong></td>
+                    <td className="cell-muted" title={v.description}>{v.description ? (v.description.length > 40 ? v.description.slice(0, 39) + '…' : v.description) : '—'}</td>
                     <td><code>{v.address}</code></td>
                     <td><span className="badge">{v.data_type}</span></td>
                     <td className="cell-value">{fmtValue(v)}</td>
