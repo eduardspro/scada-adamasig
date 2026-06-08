@@ -122,7 +122,7 @@ export default function ReactorPage() {
   }
 
   const PAD = { l: 60, r: 20, t: 8, b: 22 };
-  const baseW = 900, baseH = 350;
+  const baseW = 900, baseH = 320;
   const W = baseW * zoom, H = baseH;
   const plotW = W - PAD.l - PAD.r, plotH = H - PAD.t - PAD.b;
   const timeRange = tMax - tMin || 1;
@@ -432,7 +432,7 @@ export default function ReactorPage() {
           <p className="muted">Sin datos. Activa historización y lectura del PLC.</p>
         ) : (
           <div className="chart-scroll">
-            <svg viewBox={`0 0 ${W} ${H}`} style={{ width: `${W}px`, minWidth: '100%' }}>
+            <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%' }}>
               {visibleVars.filter(v => varData[v.id]).map((v, vi) => {
                 const range = yRanges[v.id];
                 const yOff = (vi * (plotH / visibleVars.length));
