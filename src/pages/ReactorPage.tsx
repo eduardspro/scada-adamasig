@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { api } from '../api';
 import './ReactorPage.css';
 
@@ -25,11 +25,6 @@ function fmtTime(iso: string): string {
   return d.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
 
-function fmtDate(iso: string): string {
-  const d = new Date(iso);
-  return d.toLocaleDateString('es-CO') + ' ' + d.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
-}
-
 function toLocalISO(date: Date): string {
   const pad = (n: number) => String(n).padStart(2, '0');
   return `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
@@ -45,7 +40,14 @@ export default function ReactorPage() {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
 
-  // Load variables
+  // Export modal
+  const [showExport, setShowExport] = useState(false);
+  const [exportFormat, setExportFormat] = useState('csv');
+  const [exportVarIds, setExportVarIds] = useState<Set<number>>(new Set());
+  const [exportFrom, setExportFrom] = useState('');
+  const [exportTo, setExportTo] = useState('');
+  const [exporting, setExporting] = useState(false);
+
   useEffect(() => {
     api.get<Variable[]>('/api/variables')
       .then(vars => {
@@ -57,7 +59,6 @@ export default function ReactorPage() {
       .catch(() => setError('Error al cargar variables'));
   }, []);
 
-  // Refresh values every 2s
   useEffect(() => {
     const i = setInterval(() => {
       api.get<Variable[]>('/api/variables')
@@ -76,23 +77,23 @@ export default function ReactorPage() {
       if (dateTo) body.to = dateTo + ':00';
       const data = await api.post<Record<string, HistoryPoint[]>>('/api/variables/history-batch', body);
       const parsed: Record<number, HistoryPoint[]> = {};
-      for (const [key, pts] of Object.entries(data)) {
-        parsed[Number(key)] = pts;
-      }
+      for (const [key, pts] of Object.entries(data)) parsed[Number(key)] = pts;
       setHistory(parsed);
     } catch { /* ignore */ }
   }, [variables, dateFrom, dateTo]);
 
   const toggleVar = (id: number) => {
-    setVisibleIds(prev => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
+    setVisibleIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
   };
-
   const selectAll = () => setVisibleIds(new Set(variables.map(v => v.id)));
   const selectNone = () => setVisibleIds(new Set());
+
+  const setRange = (hours: number) => {
+    const now = new Date();
+    const from = new Date(now.getTime() - hours * 3600000);
+    setDateFrom(toLocalISO(from));
+    setDateTo(toLocalISO(now));
+  };
 
   // Build chart data
   const visibleVars = variables.filter(v => visibleIds.has(v.id));
@@ -105,8 +106,7 @@ export default function ReactorPage() {
       .filter(p => !isNaN(p.value));
     if (pts.length > 0) {
       const vals = pts.map(p => p.value);
-      const name = v.name.length > 30 ? v.name.slice(0, 29) + '\u2026' : v.name;
-      varData[v.id] = { name, pts, min: Math.min(...vals), max: Math.max(...vals) };
+      varData[v.id] = { name: v.name, pts, min: Math.min(...vals), max: Math.max(...vals) };
       for (const p of pts) allPoints.push({ varId: v.id, ...p });
     }
   }
@@ -115,40 +115,25 @@ export default function ReactorPage() {
   let tMin = 0, tMax = 0;
   if (hasData) {
     const times = allPoints.map(p => p.ts);
-    tMin = Math.min(...times);
-    tMax = Math.max(...times);
+    tMin = Math.min(...times); tMax = Math.max(...times);
     if (tMin === tMax) { tMin -= 60000; tMax += 60000; }
   }
 
-  // Dimensions
   const PAD = { l: 60, r: 20, t: 20, b: 55 };
   const baseW = 900, baseH = 400;
   const W = baseW * zoom, H = baseH;
-  const plotW = W - PAD.l - PAD.r;
-  const plotH = H - PAD.t - PAD.b;
-
+  const plotW = W - PAD.l - PAD.r, plotH = H - PAD.t - PAD.b;
   const timeRange = tMax - tMin || 1;
-  const viewStart = tMin - panX;
-  const viewEnd = tMax - panX;
+  const viewStart = tMin - panX, viewEnd = tMax - panX;
   const viewRange = viewEnd - viewStart;
-
   const toX = (ts: number) => PAD.l + ((ts - viewStart) / viewRange) * plotW;
 
-  // Y-axis per variable with padding
   const yRanges: Record<number, { min: number; max: number }> = {};
   for (const [id, data] of Object.entries(varData)) {
     const pad = (data.max - data.min) * 0.15 || 1;
     yRanges[Number(id)] = { min: data.min - pad, max: data.max + pad };
   }
 
-  const globalYMin = hasData
-    ? Math.min(...Object.values(yRanges).map(r => r.min))
-    : 0;
-  const globalYMax = hasData
-    ? Math.max(...Object.values(yRanges).map(r => r.max))
-    : 100;
-
-  // Time ticks
   const ticks: { ts: number; label: string }[] = [];
   if (hasData && viewRange > 0) {
     const tickCount = Math.max(2, Math.floor(plotW / 90));
@@ -158,12 +143,79 @@ export default function ReactorPage() {
     }
   }
 
-  // Handle quick date ranges
-  const setRange = (hours: number) => {
-    const now = new Date();
-    const from = new Date(now.getTime() - hours * 3600000);
-    setDateFrom(toLocalISO(from));
-    setDateTo(toLocalISO(now));
+  // ──── EXPORT ────
+  const openExport = () => {
+    setExportVarIds(new Set(visibleIds));
+    setExportFrom(dateFrom);
+    setExportTo(dateTo);
+    setShowExport(true);
+  };
+
+  const doExport = async () => {
+    setExporting(true);
+    try {
+      const vlist = variables.filter(v => exportVarIds.has(v.id));
+      const ids = vlist.map(v => v.id);
+      const body: Record<string, unknown> = { variable_ids: ids };
+      if (exportFrom) body.from = exportFrom + ':00';
+      if (exportTo) body.to = exportTo + ':00';
+      const data = await api.post<Record<string, HistoryPoint[]>>('/api/variables/history-batch', body);
+
+      // Build aligned matrix: timestamp → { varId: value }
+      const tMap: Record<string, Record<number, string>> = {};
+      for (const [key, pts] of Object.entries(data)) {
+        for (const p of pts) {
+          const ts = new Date(p.read_at).toISOString().replace('T', ' ').slice(0, 19);
+          if (!tMap[ts]) tMap[ts] = {};
+          tMap[ts][Number(key)] = p.value;
+        }
+      }
+      const times = Object.keys(tMap).sort();
+
+      // Build rows
+      const headers = ['fechaHora', ...vlist.map(v => v.name)];
+      let content: string;
+      let blob: Blob;
+      let ext: string;
+
+      if (exportFormat === 'csv' || exportFormat === 'xlsx') {
+        const rows = [headers.join(';')];
+        for (const ts of times) {
+          const row = [ts, ...ids.map(id => tMap[ts][id] || '')];
+          rows.push(row.join(';'));
+        }
+        content = rows.join('\n');
+        ext = exportFormat === 'xlsx' ? '.xlsx' : '.csv';
+        // Excel reads CSV with semicolons fine in Spanish locale
+        const bom = exportFormat === 'xlsx' ? '\uFEFF' : '';
+        blob = new Blob([bom + content], { type: exportFormat === 'xlsx' ? 'application/vnd.ms-excel' : 'text/csv;charset=utf-8' });
+      } else {
+        // PDF via HTML table → print
+        const tableRows = times.map(ts =>
+          `<tr><td>${ts}</td>${ids.map(id => `<td>${tMap[ts][id] || ''}</td>`).join('')}</tr>`
+        ).join('');
+        const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${TITLE}</title>
+<style>body{font-family:monospace;font-size:10px;margin:20px}table{border-collapse:collapse;width:100%}th,td{border:1px solid #ccc;padding:2px 6px;text-align:right}th{background:#eee}td:first-child{text-align:left}</style></head><body>
+<h2>${TITLE} - Exportación</h2><table><thead><tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>${tableRows}</tbody></table></body></html>`;
+        const w = window.open('', '_blank');
+        if (w) { w.document.write(html); w.document.close(); w.print(); }
+        setShowExport(false);
+        setExporting(false);
+        return;
+      }
+
+      // Download
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `${GROUP}_${new Date().toISOString().slice(0,10)}${ext}`;
+      a.click();
+      URL.revokeObjectURL(url);
+      setShowExport(false);
+    } catch {
+      setError('Error al exportar');
+    } finally {
+      setExporting(false);
+    }
   };
 
   return (
@@ -211,125 +263,99 @@ export default function ReactorPage() {
         </svg>
       </div>
 
-      {/* CHART CONTROLS */}
+      {/* ── CONTROLS ── */}
       <div className="chart-controls">
-        <div className="controls-row">
-          <div className="control-group">
-            <label>📅 Desde</label>
+        <div className="controls-bar">
+          <div className="ctrl-item">
+            <label>Desde</label>
             <input type="datetime-local" value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
           </div>
-          <div className="control-group">
-            <label>📅 Hasta</label>
+          <div className="ctrl-item">
+            <label>Hasta</label>
             <input type="datetime-local" value={dateTo} onChange={e => setDateTo(e.target.value)} />
           </div>
-          <div className="control-group">
-            <label>&nbsp;</label>
-            <button onClick={() => loadHistory()} className="btn-apply">Aplicar</button>
-          </div>
-          <div className="control-group quick-btns">
-            <label>Rápido</label>
-            <div className="btn-row">
-              <button onClick={() => { setDateFrom(''); setDateTo(''); setTimeout(() => loadHistory(variables), 50); }}>Todo</button>
-              <button onClick={() => setRange(1)}>1h</button>
-              <button onClick={() => setRange(6)}>6h</button>
-              <button onClick={() => setRange(24)}>24h</button>
-              <button onClick={() => setRange(168)}>7d</button>
-            </div>
-          </div>
-        </div>
+          <button onClick={() => loadHistory()} className="btn-apply">Aplicar</button>
 
-        <div className="controls-row">
-          <div className="control-group zoom-group">
-            <label>🔍 Zoom</label>
-            <button onClick={() => setZoom(z => Math.min(z * 1.5, 8))}>+</button>
+          <div className="ctrl-sep" />
+
+          <button onClick={() => { setDateFrom(''); setDateTo(''); setTimeout(() => loadHistory(variables), 50); }} className="btn-sm">Todo</button>
+          <button onClick={() => setRange(1)} className="btn-sm">1h</button>
+          <button onClick={() => setRange(6)} className="btn-sm">6h</button>
+          <button onClick={() => setRange(24)} className="btn-sm">24h</button>
+          <button onClick={() => setRange(168)} className="btn-sm">7d</button>
+
+          <div className="ctrl-sep" />
+
+          <div className="ctrl-item zoom-ctrl">
+            <button onClick={() => setZoom(z => Math.min(z * 1.5, 8))} className="btn-sm" title="Acercar">+</button>
             <span>{zoom.toFixed(1)}x</span>
-            <button onClick={() => setZoom(z => Math.max(z / 1.5, 0.5))}>−</button>
-            <button onClick={() => { setZoom(1); setPanX(0); }}>Reset</button>
+            <button onClick={() => setZoom(z => Math.max(z / 1.5, 0.5))} className="btn-sm" title="Alejar">−</button>
           </div>
-          <div className="control-group">
-            <label>◀▶ Desplazar</label>
-            <button onClick={() => setPanX(p => p - timeRange * 0.2)}>◀</button>
-            <button onClick={() => setPanX(p => p + timeRange * 0.2)}>▶</button>
+          <div className="ctrl-item">
+            <button onClick={() => setPanX(p => p - timeRange * 0.2)} className="btn-sm" title="Izquierda">◀</button>
+            <button onClick={() => setPanX(p => p + timeRange * 0.2)} className="btn-sm" title="Derecha">▶</button>
+            <button onClick={() => { setZoom(1); setPanX(0); }} className="btn-sm">↺</button>
           </div>
+
+          <div className="ctrl-sep" />
+
+          <button onClick={openExport} className="btn-export">📥 Exportar</button>
         </div>
       </div>
 
-      {/* VARIABLE TOGGLES */}
+      {/* ── VARIABLE TOGGLES ── */}
       <div className="var-toggles">
         <button onClick={selectAll} className="btn-toggle">Todos</button>
         <button onClick={selectNone} className="btn-toggle">Ninguno</button>
         {variables.map((v, i) => (
           <label key={v.id} className="var-check" style={{ color: COLORS[i % COLORS.length] }}>
-            <input
-              type="checkbox"
-              checked={visibleIds.has(v.id)}
-              onChange={() => toggleVar(v.id)}
-            />
+            <input type="checkbox" checked={visibleIds.has(v.id)} onChange={() => toggleVar(v.id)} />
             <span className="var-dot" style={{ background: COLORS[i % COLORS.length] }} />
-            {v.name.length > 25 ? v.name.slice(0, 24) + '\u2026' : v.name}
+            {v.name.length > 28 ? v.name.slice(0, 27) + '\u2026' : v.name}
           </label>
         ))}
       </div>
 
-      {/* CHART */}
+      {/* ── CHART ── */}
       <div className="reactor-chart">
         {error && <p className="error">{error}</p>}
         {!hasData ? (
           <p className="muted">Sin datos. Activa historización y lectura del PLC.</p>
         ) : (
-          <div className="chart-scroll" style={{ overflowX: 'auto' }}>
+          <div className="chart-scroll">
             <svg viewBox={`0 0 ${W} ${H}`} style={{ width: `${W}px`, minWidth: '100%' }}>
-              {/* Grid horizontal per variable */}
               {visibleVars.filter(v => varData[v.id]).map((v, vi) => {
                 const range = yRanges[v.id];
-                const yOffset = (vi * (plotH / visibleVars.length));
+                const yOff = (vi * (plotH / visibleVars.length));
                 const segH = plotH / visibleVars.length;
                 return (
                   <g key={`grid-${v.id}`}>
-                    <line x1={PAD.l} y1={PAD.t + yOffset + segH} x2={W - PAD.r} y2={PAD.t + yOffset + segH} stroke="#1e293b" strokeWidth="1" />
-                    <text x={PAD.l - 5} y={PAD.t + yOffset + segH / 2 + 4} textAnchor="end" fill="#64748b" fontSize="8">
-                      {range.min.toFixed(1)}
-                    </text>
-                    <text x={PAD.l - 5} y={PAD.t + yOffset + 4} textAnchor="end" fill="#64748b" fontSize="8">
-                      {range.max.toFixed(1)}
-                    </text>
+                    <line x1={PAD.l} y1={PAD.t + yOff + segH} x2={W - PAD.r} y2={PAD.t + yOff + segH} stroke="#1e293b" strokeWidth="1" />
+                    <text x={PAD.l - 5} y={PAD.t + yOff + segH / 2 + 4} textAnchor="end" fill="#64748b" fontSize="8">{range.min.toFixed(1)}</text>
+                    <text x={PAD.l - 5} y={PAD.t + yOff + 4} textAnchor="end" fill="#64748b" fontSize="8">{range.max.toFixed(1)}</text>
                   </g>
                 );
               })}
-
-              {/* Time axis ticks */}
               {ticks.map((t, i) => (
                 <g key={`tick-${i}`}>
                   <line x1={toX(t.ts)} y1={H - PAD.b} x2={toX(t.ts)} y2={H - PAD.b + 5} stroke="#475569" />
-                  <text x={toX(t.ts)} y={H - PAD.b + 18} textAnchor="middle" fill="#64748b" fontSize="9">
-                    {t.label}
-                  </text>
+                  <text x={toX(t.ts)} y={H - PAD.b + 18} textAnchor="middle" fill="#64748b" fontSize="9">{t.label}</text>
                 </g>
               ))}
-
-              {/* Lines */}
               {visibleVars.filter(v => varData[v.id] && varData[v.id].pts.length >= 2).map((v, vi) => {
                 const data = varData[v.id];
                 const range = yRanges[v.id];
-                const yOffset = (vi * (plotH / visibleVars.length));
+                const yOff = (vi * (plotH / visibleVars.length));
                 const segH = plotH / visibleVars.length;
                 const color = COLORS[vi % COLORS.length];
-
-                const toY = (val: number) => PAD.t + yOffset + segH - ((val - range.min) / (range.max - range.min)) * segH;
-
-                const pathD = data.pts
-                  .filter(p => p.ts >= viewStart && p.ts <= viewEnd)
-                  .map((p, i) => `${i === 0 ? 'M' : 'L'} ${toX(p.ts)} ${toY(p.value)}`)
-                  .join(' ');
-
+                const toY = (val: number) => PAD.t + yOff + segH - ((val - range.min) / (range.max - range.min)) * segH;
+                const pathD = data.pts.filter(p => p.ts >= viewStart && p.ts <= viewEnd)
+                  .map((p, i) => `${i === 0 ? 'M' : 'L'} ${toX(p.ts)} ${toY(p.value)}`).join(' ');
                 return (
                   <g key={`line-${v.id}`}>
                     <path d={pathD} fill="none" stroke={color} strokeWidth="1.5" opacity="0.85" />
-                    {/* Legend */}
                     <rect x={W - PAD.r - 180} y={PAD.t + vi * 16} width="8" height="8" fill={color} rx="1" />
-                    <text x={W - PAD.r - 168} y={PAD.t + vi * 16 + 8} fill="#94a3b8" fontSize="8">
-                      {data.name}
-                    </text>
+                    <text x={W - PAD.r - 168} y={PAD.t + vi * 16 + 8} fill="#94a3b8" fontSize="8">{data.name}</text>
                   </g>
                 );
               })}
@@ -337,6 +363,61 @@ export default function ReactorPage() {
           </div>
         )}
       </div>
+
+      {/* ── EXPORT MODAL ── */}
+      {showExport && (
+        <div className="modal-overlay" onClick={() => setShowExport(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
+            <h3>📥 Exportar datos</h3>
+
+            <div className="export-row">
+              <label>Formato</label>
+              <select value={exportFormat} onChange={e => setExportFormat(e.target.value)}>
+                <option value="csv">CSV (semicolon)</option>
+                <option value="xlsx">Excel (.xlsx)</option>
+                <option value="pdf">PDF (imprimir)</option>
+              </select>
+            </div>
+
+            <div className="export-row">
+              <label>Desde</label>
+              <input type="datetime-local" value={exportFrom} onChange={e => setExportFrom(e.target.value)} />
+              <label>Hasta</label>
+              <input type="datetime-local" value={exportTo} onChange={e => setExportTo(e.target.value)} />
+            </div>
+
+            <div className="export-vars">
+              <label>Variables a exportar</label>
+              <div className="export-var-list">
+                <label className="var-check">
+                  <input type="checkbox" checked={exportVarIds.size === variables.length}
+                    onChange={e => e.target.checked ? setExportVarIds(new Set(variables.map(v => v.id))) : setExportVarIds(new Set())} />
+                  <span className="var-dot" style={{ background: '#94a3b8' }} /> Todos
+                </label>
+                {variables.map((v, i) => (
+                  <label key={v.id} className="var-check" style={{ color: COLORS[i % COLORS.length] }}>
+                    <input type="checkbox" checked={exportVarIds.has(v.id)}
+                      onChange={e => {
+                        const n = new Set(exportVarIds);
+                        e.target.checked ? n.add(v.id) : n.delete(v.id);
+                        setExportVarIds(n);
+                      }} />
+                    <span className="var-dot" style={{ background: COLORS[i % COLORS.length] }} />
+                    {v.name}
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div className="export-actions">
+              <button onClick={() => setShowExport(false)} className="btn-sm">Cancelar</button>
+              <button onClick={doExport} disabled={exporting} className="btn-apply">
+                {exporting ? 'Exportando...' : 'Exportar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
