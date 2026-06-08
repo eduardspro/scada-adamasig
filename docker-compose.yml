@@ -1,0 +1,36 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: adama-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: adamasig2026
+      POSTGRES_DB: adamasig
+    ports:
+      - "54323:5432"
+    volumes:
+      - adama-db-data:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d adamasig"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  app:
+    build: .
+    container_name: adama-app
+    restart: unless-stopped
+    ports:
+      - "3002:80"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://postgres:adamasig2026@db:5432/adamasig
+      JWT_SECRET: adamasig-jwt-secret-2026
+      NODE_ENV: production
+
+volumes:
+  adama-db-data:
