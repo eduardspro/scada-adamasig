@@ -439,8 +439,9 @@ export default function Reactor2Page() {
                 const segH = plotH / visibleVars.length;
                 return (
                   <g key={`grid-${v.id}`}>
+                    <line x1={PAD.l} y1={PAD.t + yOff} x2={W - PAD.r} y2={PAD.t + yOff} stroke="#1e293b" strokeWidth="1" />
                     <line x1={PAD.l} y1={PAD.t + yOff + segH} x2={W - PAD.r} y2={PAD.t + yOff + segH} stroke="#1e293b" strokeWidth="1" />
-                    <text x={PAD.l - 5} y={PAD.t + yOff + segH / 2 + 4} textAnchor="end" fill="#64748b" fontSize="8">{range.min.toFixed(1)}</text>
+                    <text x={PAD.l - 5} y={PAD.t + yOff + segH + 4} textAnchor="end" fill="#64748b" fontSize="8">{range.min.toFixed(1)}</text>
                     <text x={PAD.l - 5} y={PAD.t + yOff + 4} textAnchor="end" fill="#64748b" fontSize="8">{range.max.toFixed(1)}</text>
                   </g>
                 );
