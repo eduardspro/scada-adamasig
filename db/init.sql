@@ -51,4 +51,21 @@ CREATE TABLE IF NOT EXISTS variable_history (
 CREATE INDEX IF NOT EXISTS idx_variable_history_var ON variable_history(variable_id);
 CREATE INDEX IF NOT EXISTS idx_variable_history_read ON variable_history(read_at DESC);
 
+CREATE TABLE IF NOT EXISTS alarm_configs (
+    id SERIAL PRIMARY KEY,
+    variable_id INTEGER REFERENCES variables(id) ON DELETE CASCADE,
+    enabled BOOLEAN DEFAULT true,
+    ll_value DOUBLE PRECISION,
+    ll_color VARCHAR(20) DEFAULT '#ef4444',
+    l_value DOUBLE PRECISION,
+    l_color VARCHAR(20) DEFAULT '#f59e0b',
+    h_value DOUBLE PRECISION,
+    h_color VARCHAR(20) DEFAULT '#f59e0b',
+    hh_value DOUBLE PRECISION,
+    hh_color VARCHAR(20) DEFAULT '#ef4444',
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_alarm_configs_var ON alarm_configs(variable_id);
+
 

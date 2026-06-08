@@ -595,6 +595,114 @@ app.post('/api/variables/read-all', authMiddleware, async (req, res) => {
   }
 });
 
+// ========== ALARMS API ==========
+
+// GET /api/alarms — list all alarm configs with variable data
+app.get('/api/alarms', authMiddleware, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT a.id, a.variable_id, a.enabled, a.ll_value, a.ll_color,
+              a.l_value, a.l_color, a.h_value, a.h_color, a.hh_value, a.hh_color,
+              a.created_at, a.updated_at,
+              v.name as variable_name, v.value as variable_value, v.data_type,
+              v."group", v.description, c.name as connection_name
+       FROM alarm_configs a
+       JOIN variables v ON a.variable_id = v.id
+       JOIN connections c ON v.connection_id = c.id
+       WHERE c.user_id = $1
+       ORDER BY a.created_at DESC`,
+      [req.user.id]
+    );
+    return res.json(result.rows);
+  } catch (err) {
+    console.error('List alarms error:', err);
+    return res.status(500).json({ error: 'Error interno' });
+  }
+});
+
+// POST /api/alarms — create alarm config
+app.post('/api/alarms', authMiddleware, async (req, res) => {
+  const { variable_id, ll_value, ll_color, l_value, l_color, h_value, h_color, hh_value, hh_color } = req.body;
+  if (!variable_id) return res.status(400).json({ error: 'variable_id requerido' });
+  try {
+    // Verify variable belongs to user
+    const check = await pool.query(
+      `SELECT v.id FROM variables v JOIN connections c ON v.connection_id = c.id
+       WHERE v.id = $1 AND c.user_id = $2`,
+      [variable_id, req.user.id]
+    );
+    if (check.rows.length === 0) return res.status(404).json({ error: 'Variable no encontrada' });
+
+    const result = await pool.query(
+      `INSERT INTO alarm_configs (variable_id, ll_value, ll_color, l_value, l_color, h_value, h_color, hh_value, hh_color)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+       RETURNING *`,
+      [variable_id, ll_value || null, ll_color || '#ef4444', l_value || null, l_color || '#f59e0b',
+       h_value || null, h_color || '#f59e0b', hh_value || null, hh_color || '#ef4444']
+    );
+    return res.status(201).json(result.rows[0]);
+  } catch (err) {
+    console.error('Create alarm error:', err);
+    return res.status(500).json({ error: 'Error interno' });
+  }
+});
+
+// PUT /api/alarms/:id — update alarm config
+app.put('/api/alarms/:id', authMiddleware, async (req, res) => {
+  const { ll_value, ll_color, l_value, l_color, h_value, h_color, hh_value, hh_color } = req.body;
+  try {
+    const result = await pool.query(
+      `UPDATE alarm_configs SET ll_value=$1, ll_color=$2, l_value=$3, l_color=$4,
+              h_value=$5, h_color=$6, hh_value=$7, hh_color=$8, updated_at=NOW()
+       WHERE id=$9 AND variable_id IN (SELECT v.id FROM variables v JOIN connections c ON v.connection_id = c.id WHERE c.user_id = $10)
+       RETURNING *`,
+      [ll_value || null, ll_color || '#ef4444', l_value || null, l_color || '#f59e0b',
+       h_value || null, h_color || '#f59e0b', hh_value || null, hh_color || '#ef4444',
+       req.params.id, req.user.id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Alarma no encontrada' });
+    return res.json(result.rows[0]);
+  } catch (err) {
+    console.error('Update alarm error:', err);
+    return res.status(500).json({ error: 'Error interno' });
+  }
+});
+
+// PATCH /api/alarms/:id — toggle enabled
+app.patch('/api/alarms/:id', authMiddleware, async (req, res) => {
+  const { enabled } = req.body;
+  try {
+    const result = await pool.query(
+      `UPDATE alarm_configs SET enabled=$1, updated_at=NOW()
+       WHERE id=$2 AND variable_id IN (SELECT v.id FROM variables v JOIN connections c ON v.connection_id = c.id WHERE c.user_id = $3)
+       RETURNING *`,
+      [enabled, req.params.id, req.user.id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Alarma no encontrada' });
+    return res.json(result.rows[0]);
+  } catch (err) {
+    console.error('Toggle alarm error:', err);
+    return res.status(500).json({ error: 'Error interno' });
+  }
+});
+
+// DELETE /api/alarms/:id
+app.delete('/api/alarms/:id', authMiddleware, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `DELETE FROM alarm_configs WHERE id=$1 AND variable_id IN
+       (SELECT v.id FROM variables v JOIN connections c ON v.connection_id = c.id WHERE c.user_id = $2)
+       RETURNING id`,
+      [req.params.id, req.user.id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Alarma no encontrada' });
+    return res.json({ deleted: true });
+  } catch (err) {
+    console.error('Delete alarm error:', err);
+    return res.status(500).json({ error: 'Error interno' });
+  }
+});
+
 // Serve frontend static files
 app.use(express.static(path.join(__dirname, '..', 'dist')));
 

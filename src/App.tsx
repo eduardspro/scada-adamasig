@@ -5,6 +5,7 @@ import ConnectionsPage from './pages/ConnectionsPage';
 import VariablesPage from './pages/VariablesPage';
 import ReactorPage from './pages/ReactorPage';
 import Reactor2Page from './pages/Reactor2Page';
+import AlarmsPage from './pages/AlarmsPage';
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { api } from './api';
 
@@ -92,6 +93,7 @@ function AppContent() {
         <Route path="/variables" element={<VariablesPage user={user!} onLogout={handleLogout} />} />
         <Route path="/reactor" element={<ReactorPage />} />
         <Route path="/reactor2" element={<Reactor2Page />} />
+        <Route path="/alarms" element={<AlarmsPage />} />
       </Route>
       <Route path="*" element={<Navigate to={user ? '/connections' : '/login'} />} />
     </Routes>

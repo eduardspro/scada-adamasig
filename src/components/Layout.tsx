@@ -21,6 +21,9 @@ export default function Layout() {
           <NavLink to="/reactor2" className={linkClass}>
             <span className="nav-icon">⚗️</span> Reactor 2
           </NavLink>
+          <NavLink to="/alarms" className={linkClass}>
+            <span className="nav-icon">🚨</span> Alarmas
+          </NavLink>
 
         </nav>
       </aside>
